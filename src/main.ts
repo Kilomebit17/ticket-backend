@@ -5,9 +5,9 @@ import { AppModule } from './app.module';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS for frontend
+  // Enable CORS for all origins
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: true, // Allow all origins
     credentials: true,
   });
 
@@ -24,9 +24,13 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api');
 
   const port = process.env.PORT || 3000;
-  await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}/api`);
+  // Listen on 0.0.0.0 to accept connections from Railway's proxy
+  await app.listen(port, '0.0.0.0');
+  console.log(`Application is running on: http://0.0.0.0:${port}/api`);
 }
 
-bootstrap();
+bootstrap().catch((error: Error) => {
+  console.error('Error starting the application:', error);
+  process.exit(1);
+});
 
