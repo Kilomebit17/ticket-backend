@@ -37,14 +37,14 @@ export function validateTelegramInitData(
     const urlParams = new URLSearchParams(initDataRaw);
     
     // Check for 'hash' (old format, hex) or 'signature' (new format, base64url)
-    // Telegram sends ONLY ONE of them, not both
+    // Telegram can send BOTH, so we need to remove both from dataCheckString
     const hashParam = urlParams.get('hash');
     const signatureParam = urlParams.get('signature');
     
-    // Determine which parameter exists and its format
+    // Prefer signature if both exist (newer format), otherwise use whichever exists
     const isSignatureFormat = !!signatureParam; // signature = base64url, hash = hex
-    const hash = hashParam || signatureParam;
-    const hashParamName = hashParam ? 'hash' : 'signature';
+    const hash = signatureParam || hashParam; // Prefer signature over hash
+    const hashParamName = signatureParam ? 'signature' : 'hash';
     
     if (!hash) {
       console.error('Validation failed: Missing hash/signature parameter', {
@@ -53,12 +53,10 @@ export function validateTelegramInitData(
       return null;
     }
 
-    // Remove only the parameter that exists (Telegram sends only one)
-    if (hashParam) {
-      urlParams.delete('hash');
-    } else {
-      urlParams.delete('signature');
-    }
+    // Remove BOTH hash and signature from params before building dataCheckString
+    // (Telegram can send both, but we exclude both from validation)
+    urlParams.delete('hash');
+    urlParams.delete('signature');
 
     // Sort parameters alphabetically
     const dataCheckString = Array.from(urlParams.entries())
