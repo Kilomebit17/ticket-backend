@@ -27,10 +27,16 @@ export function validateTelegramInitData(
   botToken: string,
 ): TelegramInitData | null {
   try {
+    if (!initDataRaw || !botToken) {
+      console.error('Validation failed: Missing initDataRaw or botToken');
+      return null;
+    }
+
     // Parse init data
     const urlParams = new URLSearchParams(initDataRaw);
     const hash = urlParams.get('hash');
     if (!hash) {
+      console.error('Validation failed: Missing hash parameter');
       return null;
     }
 
@@ -57,16 +63,39 @@ export function validateTelegramInitData(
 
     // Verify hash
     if (calculatedHash !== hash) {
+      console.error('Validation failed: Hash mismatch', {
+        received: hash,
+        calculated: calculatedHash,
+        dataCheckString,
+        params: Object.fromEntries(urlParams.entries()),
+      });
       return null;
     }
 
     // Check auth_date (should be within 24 hours)
-    const authDate = parseInt(urlParams.get('auth_date') || '0', 10);
+    const authDateStr = urlParams.get('auth_date');
+    if (!authDateStr) {
+      console.error('Validation failed: Missing auth_date parameter');
+      return null;
+    }
+
+    const authDate = parseInt(authDateStr, 10);
+    if (isNaN(authDate)) {
+      console.error('Validation failed: Invalid auth_date format', { authDateStr });
+      return null;
+    }
+
     const currentTime = Math.floor(Date.now() / 1000);
     const timeDiff = currentTime - authDate;
 
     // Allow 24 hours validity
     if (timeDiff > 86400) {
+      console.error('Validation failed: Auth date expired', {
+        authDate,
+        currentTime,
+        timeDiff,
+        hoursDiff: (timeDiff / 3600).toFixed(2),
+      });
       return null;
     }
 
@@ -77,10 +106,16 @@ export function validateTelegramInitData(
     if (userStr) {
       try {
         user = JSON.parse(decodeURIComponent(userStr));
-      } catch {
-        // Invalid user JSON
+      } catch (parseError) {
+        console.error('Validation failed: Invalid user JSON', {
+          userStr,
+          error: parseError instanceof Error ? parseError.message : 'Unknown error',
+        });
         return null;
       }
+    } else {
+      console.error('Validation failed: Missing user parameter');
+      return null;
     }
 
     return {
@@ -91,18 +126,41 @@ export function validateTelegramInitData(
       start_param: urlParams.get('start_param') || undefined,
     };
   } catch (error) {
-    console.error('Error validating Telegram init data:', error);
+    console.error('Error validating Telegram init data:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      initDataRaw: initDataRaw?.substring(0, 100), // Log first 100 chars for debugging
+    });
     return null;
   }
 }
 
 /**
  * Extracts Telegram init data from request header
+ * Handles potential URL encoding issues and whitespace
  */
 export function extractInitDataFromHeader(header: string | undefined): string | null {
   if (!header) {
     return null;
   }
-  return header;
+
+  // Trim whitespace (headers can have leading/trailing spaces)
+  let processedHeader = header.trim();
+
+  // Try to decode if it appears to be URL-encoded
+  // Check if header contains % signs (indicating URL encoding)
+  if (processedHeader.includes('%')) {
+    try {
+      const decoded = decodeURIComponent(processedHeader);
+      // If decoding succeeds and produces valid init data format, use it
+      if (decoded.includes('hash=') && decoded.includes('auth_date=')) {
+        return decoded;
+      }
+    } catch {
+      // If decoding fails, continue with original header
+    }
+  }
+
+  return processedHeader;
 }
 

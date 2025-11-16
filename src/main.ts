@@ -26,7 +26,6 @@ async function bootstrap(): Promise<void> {
   const port = process.env.PORT || 3000;
   // Listen on 0.0.0.0 to accept connections from Railway's proxy
   await app.listen(port, '0.0.0.0');
-  console.log(`Application is running on: http://0.0.0.0:${port}/api`);
 }
 
 bootstrap().catch((error: Error) => {

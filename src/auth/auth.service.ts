@@ -30,11 +30,22 @@ export class AuthService {
 
     const initDataRaw = extractInitDataFromHeader(initDataHeader);
     if (!initDataRaw) {
+      console.error('Auth checkUser: No init data received', { header: initDataHeader });
       throw new UnauthorizedException('Telegram init data is required');
     }
 
+    console.log('Auth checkUser: Validating init data', {
+      initDataLength: initDataRaw.length,
+      initDataPreview: initDataRaw.substring(0, 100),
+      hasBotToken: !!botToken,
+    });
+
     const validatedData = validateTelegramInitData(initDataRaw, botToken);
     if (!validatedData || !validatedData.user) {
+      console.error('Auth checkUser: Validation failed', {
+        hasValidatedData: !!validatedData,
+        hasUser: !!validatedData?.user,
+      });
       throw new UnauthorizedException('Invalid Telegram init data');
     }
 
@@ -60,11 +71,22 @@ export class AuthService {
 
     const initDataRaw = extractInitDataFromHeader(initDataHeader);
     if (!initDataRaw) {
+      console.error('Auth register: No init data received', { header: initDataHeader });
       throw new UnauthorizedException('Telegram init data is required');
     }
 
+    console.log('Auth register: Validating init data', {
+      initDataLength: initDataRaw.length,
+      initDataPreview: initDataRaw.substring(0, 100),
+      hasBotToken: !!botToken,
+    });
+
     const validatedData = validateTelegramInitData(initDataRaw, botToken);
     if (!validatedData || !validatedData.user) {
+      console.error('Auth register: Validation failed', {
+        hasValidatedData: !!validatedData,
+        hasUser: !!validatedData?.user,
+      });
       throw new UnauthorizedException('Invalid Telegram init data');
     }
 
