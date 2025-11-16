@@ -12,6 +12,7 @@ export interface TelegramInitData {
   };
   auth_date: number;
   hash: string;
+  signature?: string; // Newer Telegram WebApp format uses signature instead of hash
   query_id?: string;
   start_param?: string;
 }
@@ -34,14 +35,30 @@ export function validateTelegramInitData(
 
     // Parse init data
     const urlParams = new URLSearchParams(initDataRaw);
-    const hash = urlParams.get('hash');
+    
+    // Check for 'hash' (old format, hex) or 'signature' (new format, base64url)
+    // Telegram sends ONLY ONE of them, not both
+    const hashParam = urlParams.get('hash');
+    const signatureParam = urlParams.get('signature');
+    
+    // Determine which parameter exists and its format
+    const isSignatureFormat = !!signatureParam; // signature = base64url, hash = hex
+    const hash = hashParam || signatureParam;
+    const hashParamName = hashParam ? 'hash' : 'signature';
+    
     if (!hash) {
-      console.error('Validation failed: Missing hash parameter');
+      console.error('Validation failed: Missing hash/signature parameter', {
+        availableParams: Array.from(urlParams.keys()),
+      });
       return null;
     }
 
-    // Remove hash from params for validation
-    urlParams.delete('hash');
+    // Remove only the parameter that exists (Telegram sends only one)
+    if (hashParam) {
+      urlParams.delete('hash');
+    } else {
+      urlParams.delete('signature');
+    }
 
     // Sort parameters alphabetically
     const dataCheckString = Array.from(urlParams.entries())
@@ -55,17 +72,35 @@ export function validateTelegramInitData(
       .update(botToken)
       .digest();
 
-    // Calculate hash
-    const calculatedHash = crypto
+    // Calculate hash - get binary digest first (digest() can only be called once)
+    // Then convert to appropriate format based on parameter type
+    // signature parameter = base64url format, hash parameter = hex format
+    const hmac = crypto
       .createHmac('sha256', secretKey)
-      .update(dataCheckString)
-      .digest('hex');
+      .update(dataCheckString);
+    
+    // Get binary digest (can only call digest() once)
+    const hashBuffer = hmac.digest();
+    
+    // Convert to appropriate format based on parameter type
+    let calculatedHashToCompare: string;
+    if (isSignatureFormat) {
+      // For signature parameter: convert to base64url
+      const base64 = hashBuffer.toString('base64');
+      // Convert to base64url: replace + with -, / with _, and remove padding
+      calculatedHashToCompare = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    } else {
+      // For hash parameter: convert to hex
+      calculatedHashToCompare = hashBuffer.toString('hex');
+    }
 
     // Verify hash
-    if (calculatedHash !== hash) {
+    if (calculatedHashToCompare !== hash) {
       console.error('Validation failed: Hash mismatch', {
         received: hash,
-        calculated: calculatedHash,
+        calculated: calculatedHashToCompare,
+        format: isSignatureFormat ? 'base64url (signature)' : 'hex (hash)',
+        paramName: hashParamName,
         dataCheckString,
         params: Object.fromEntries(urlParams.entries()),
       });
@@ -122,6 +157,7 @@ export function validateTelegramInitData(
       user,
       auth_date: authDate,
       hash,
+      signature: hashParamName === 'signature' ? hash : undefined,
       query_id: urlParams.get('query_id') || undefined,
       start_param: urlParams.get('start_param') || undefined,
     };
@@ -153,7 +189,8 @@ export function extractInitDataFromHeader(header: string | undefined): string | 
     try {
       const decoded = decodeURIComponent(processedHeader);
       // If decoding succeeds and produces valid init data format, use it
-      if (decoded.includes('hash=') && decoded.includes('auth_date=')) {
+      // Check for both hash (old format) and signature (new format)
+      if (decoded.includes('auth_date=') && (decoded.includes('hash=') || decoded.includes('signature='))) {
         return decoded;
       }
     } catch {
