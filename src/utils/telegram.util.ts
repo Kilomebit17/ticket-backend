@@ -41,10 +41,12 @@ export function validateTelegramInitData(
     const hashParam = urlParams.get('hash');
     const signatureParam = urlParams.get('signature');
     
+    // Determine which parameter to use for validation
     // Prefer signature if both exist (newer format), otherwise use whichever exists
-    const isSignatureFormat = !!signatureParam; // signature = base64url, hash = hex
-    const hash = signatureParam || hashParam; // Prefer signature over hash
+    const hash = signatureParam || hashParam;
     const hashParamName = signatureParam ? 'signature' : 'hash';
+    // Determine format based on which parameter we're actually using
+    const useSignature = hashParamName === 'signature';
     
     if (!hash) {
       console.error('Validation failed: Missing hash/signature parameter', {
@@ -55,11 +57,16 @@ export function validateTelegramInitData(
 
     // Remove BOTH hash and signature from params before building dataCheckString
     // (Telegram can send both, but we exclude both from validation)
-    urlParams.delete('hash');
-    urlParams.delete('signature');
+    // Create a new URLSearchParams to ensure clean removal
+    const paramsForValidation = new URLSearchParams();
+    for (const [key, value] of urlParams.entries()) {
+      if (key !== 'hash' && key !== 'signature') {
+        paramsForValidation.append(key, value);
+      }
+    }
 
     // Sort parameters alphabetically
-    const dataCheckString = Array.from(urlParams.entries())
+    const dataCheckString = Array.from(paramsForValidation.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, value]) => `${key}=${value}`)
       .join('\n');
@@ -82,7 +89,7 @@ export function validateTelegramInitData(
     
     // Convert to appropriate format based on parameter type
     let calculatedHashToCompare: string;
-    if (isSignatureFormat) {
+    if (useSignature) {
       // For signature parameter: convert to base64url
       const base64 = hashBuffer.toString('base64');
       // Convert to base64url: replace + with -, / with _, and remove padding
@@ -97,10 +104,12 @@ export function validateTelegramInitData(
       console.error('Validation failed: Hash mismatch', {
         received: hash,
         calculated: calculatedHashToCompare,
-        format: isSignatureFormat ? 'base64url (signature)' : 'hex (hash)',
+        format: useSignature ? 'base64url (signature)' : 'hex (hash)',
         paramName: hashParamName,
         dataCheckString,
-        params: Object.fromEntries(urlParams.entries()),
+        params: Object.fromEntries(paramsForValidation.entries()),
+        hasHashParam: !!hashParam,
+        hasSignatureParam: !!signatureParam,
       });
       return null;
     }
