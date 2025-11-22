@@ -45,15 +45,37 @@ export class AuthService {
     try {
       parsed = parse(initDataRaw);
     } catch (e) {
-      console.error('Auth checkUser: Failed to parse init data', e);
+      console.error('Auth checkUser: Failed to parse init data', {
+        error: e instanceof Error ? e.message : String(e),
+        initDataLength: initDataRaw.length,
+        initDataPreview: initDataRaw.substring(0, 150),
+      });
       throw new UnauthorizedException('Invalid Telegram init data');
     }
 
-    // 2️⃣ Validate hash/signature
+    // 2️⃣ Validate hash/signature with expiration check disabled (client handles expiration)
+    // Telegram init data expires after 24 hours by default, but we want to allow older data
+    // for better UX. The client app should handle its own expiration logic.
     try {
-      validate(initDataRaw, botToken);
+      validate(initDataRaw, botToken, { expiresIn: 0 });
     } catch (e) {
-      console.error('Auth checkUser: Validation failed', e);
+      // Log detailed error information for debugging
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      const errorName = e instanceof Error ? e.constructor.name : 'UnknownError';
+      
+      console.error('Auth checkUser: Validation failed', {
+        error: errorMessage,
+        errorName,
+        initDataLength: initDataRaw.length,
+        initDataPreview: initDataRaw.substring(0, 150),
+        hasBotToken: !!botToken,
+        botTokenLength: botToken?.length ?? 0,
+        authDate:
+          parsed.authDate && typeof parsed.authDate === 'number'
+            ? new Date(parsed.authDate * 1000).toISOString()
+            : null,
+      });
+      
       throw new UnauthorizedException('Unauthorized: Telegram data invalid');
     }
 
@@ -108,9 +130,15 @@ export class AuthService {
     let parsed;
     try {
       parsed = parse(initDataRaw);
-      validate(initDataRaw, botToken);
+      // Disable expiration check for registration (client handles expiration)
+      validate(initDataRaw, botToken, { expiresIn: 0 });
     } catch (e) {
-      console.error('Auth register: Validation failed', e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      console.error('Auth register: Validation failed', {
+        error: errorMessage,
+        initDataLength: initDataRaw.length,
+        initDataPreview: initDataRaw.substring(0, 150),
+      });
       throw new UnauthorizedException('Invalid Telegram init data');
     }
 
@@ -166,8 +194,14 @@ export class AuthService {
     let parsed;
     try {
       parsed = parse(initDataRaw);
-      validate(initDataRaw, botToken);
+      // Disable expiration check (client handles expiration)
+      validate(initDataRaw, botToken, { expiresIn: 0 });
     } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      console.error('Auth getUserByInitData: Validation failed', {
+        error: errorMessage,
+        initDataLength: initDataRaw.length,
+      });
       throw new UnauthorizedException('Invalid Telegram init data');
     }
 
