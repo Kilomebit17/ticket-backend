@@ -2,10 +2,9 @@ import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { User, Sex } from '../entities/user.entity';
 import { extractInitDataFromHeader } from '../utils/telegram.util';
-import { parse, validate } from '@tma.js/init-data-node';
+import { parse,validate, isValid } from '@tma.js/init-data-node';
 
 export interface RegisterDto {
   name: string;
@@ -18,14 +17,13 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly configService: ConfigService,
-    private readonly jwtService: JwtService,
   ) {}
 
   /**
    * Validates Telegram init data and checks if user exists in DB
-   * Returns JWT token if user exists, throws 401 if not
+   * Returns user if exists, throws 401 if not
    */
-  async checkUser(initDataHeader: string | undefined): Promise<string> {
+  async checkUser(initData: string): Promise<User> {
     const botToken =
       this.configService.get<string>('TELEGRAM_BOT_TOKEN') || process.env.TELEGRAM_BOT_TOKEN;
 
@@ -33,62 +31,24 @@ export class AuthService {
       throw new Error('TELEGRAM_BOT_TOKEN is not configured');
     }
 
-    const initDataRaw = extractInitDataFromHeader(initDataHeader);
+    const initDataRaw = isValid(initData, botToken);
 
     if (!initDataRaw) {
-      console.error('Auth checkUser: No init data', { header: initDataHeader });
+      console.error('Auth checkUser: No init data', { header: initData });
       throw new UnauthorizedException('Telegram init data is required');
     }
 
-    // 1️⃣ Parse the incoming init data
-    let parsed;
-    try {
-      parsed = parse(initDataRaw);
-    } catch (e) {
-      console.error('Auth checkUser: Failed to parse init data', {
-        error: e instanceof Error ? e.message : String(e),
-        initDataLength: initDataRaw.length,
-        initDataPreview: initDataRaw.substring(0, 150),
-      });
-      throw new UnauthorizedException('Invalid Telegram init data');
-    }
+    // Парсим initData и достаем Telegram ID пользователя
+    const tgId = parse(initData).user?.id;
 
-    // 2️⃣ Validate hash/signature with expiration check disabled (client handles expiration)
-    // Telegram init data expires after 24 hours by default, but we want to allow older data
-    // for better UX. The client app should handle its own expiration logic.
-    try {
-      validate(initDataRaw, botToken, { expiresIn: 0 });
-    } catch (e) {
-      // Log detailed error information for debugging
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      const errorName = e instanceof Error ? e.constructor.name : 'UnknownError';
-      
-      console.error('Auth checkUser: Validation failed', {
-        error: errorMessage,
-        errorName,
-        initDataLength: initDataRaw.length,
-        initDataPreview: initDataRaw.substring(0, 150),
-        hasBotToken: !!botToken,
-        botTokenLength: botToken?.length ?? 0,
-        authDate:
-          parsed.authDate && typeof parsed.authDate === 'number'
-            ? new Date(parsed.authDate * 1000).toISOString()
-            : null,
-      });
-      
-      throw new UnauthorizedException('Unauthorized: Telegram data invalid');
+    if (!tgId) {
+      throw new BadRequestException('AUTH__INVALID_INITDATA'); // Ошибка, если ID отсутствует
     }
-
-    if (!parsed.user) {
-      throw new UnauthorizedException('No Telegram user data provided');
-    }
-
-    const tgUser = parsed.user;
 
     // Telegram ID
-    const telegramId = String(tgUser.id);
+    const telegramId = String(tgId);
 
-    // 3️⃣ Check if user exists in DB
+    // Check if user exists in DB
     const user = await this.userRepository.findOne({
       where: { telegramId },
     });
@@ -97,81 +57,40 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    // 4️⃣ Generate and return JWT token
-    const payload = { sub: user.id, telegramId: user.telegramId };
-    const token = this.jwtService.sign(payload);
-
-    return token;
+    return user;
   }
 
   /**
    * Registers a new user with Telegram init data
    */
-  async register(initDataHeader: string | undefined, registerDto: RegisterDto): Promise<User> {
-    const botToken =
-      this.configService.get<string>('TELEGRAM_BOT_TOKEN') || process.env.TELEGRAM_BOT_TOKEN;
-    if (!botToken) {
-      throw new Error('TELEGRAM_BOT_TOKEN is not configured in environment variables');
-    }
+  // async register(initDataHeader: string | undefined, registerDto: RegisterDto): Promise<User> {
+  //   const botToken =
+  //     this.configService.get<string>('TELEGRAM_BOT_TOKEN') || process.env.TELEGRAM_BOT_TOKEN;
+  //   if (!botToken) {
+  //     throw new Error('TELEGRAM_BOT_TOKEN is not configured in environment variables');
+  //   }
 
-    const initDataRaw = extractInitDataFromHeader(initDataHeader);
-    if (!initDataRaw) {
-      console.error('Auth register: No init data received', { header: initDataHeader });
-      throw new UnauthorizedException('Telegram init data is required');
-    }
+  //   const initDataRaw = extractInitDataFromHeader(initDataHeader);
+  //   if (!initDataRaw) {
+  //     console.error('Auth register: No init data received', { header: initDataHeader });
+  //     throw new UnauthorizedException('Telegram init data is required');
+  //   }
 
-    console.log('Auth register: Validating init data', {
-      initDataLength: initDataRaw.length,
-      initDataPreview: initDataRaw.substring(0, 100),
-      hasBotToken: !!botToken,
-    });
 
-    // Parse and validate init data
-    let parsed;
-    try {
-      parsed = parse(initDataRaw);
-      // Disable expiration check for registration (client handles expiration)
-      validate(initDataRaw, botToken, { expiresIn: 0 });
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      console.error('Auth register: Validation failed', {
-        error: errorMessage,
-        initDataLength: initDataRaw.length,
-        initDataPreview: initDataRaw.substring(0, 150),
-      });
-      throw new UnauthorizedException('Invalid Telegram init data');
-    }
+  //   // Create new user
+  //   const user = this.userRepository.create({
+  //     telegramId,
+  //     firstName: tgUser.firstName ?? '',
+  //     lastName: tgUser.lastName ?? null,
+  //     username: tgUser.username ?? null,
+  //     name: registerDto.name,
+  //     sex: registerDto.sex,
+  //     balance: 0,
+  //     photoUrl: tgUser.photoUrl ?? null,
+  //   } as Partial<User>);
 
-    if (!parsed.user) {
-      throw new UnauthorizedException('No Telegram user data provided');
-    }
-
-    const tgUser = parsed.user;
-    const telegramId = String(tgUser.id);
-
-    // Check if user already exists
-    const existingUser = await this.userRepository.findOne({
-      where: { telegramId },
-    });
-
-    if (existingUser) {
-      throw new BadRequestException('User already exists');
-    }
-
-    // Create new user
-    const user = this.userRepository.create({
-      telegramId,
-      firstName: tgUser.firstName ?? '',
-      lastName: tgUser.lastName ?? null,
-      username: tgUser.username ?? null,
-      name: registerDto.name,
-      sex: registerDto.sex,
-      balance: 0,
-      photoUrl: tgUser.photoUrl ?? null,
-    } as Partial<User>);
-
-    return await this.userRepository.save(user);
-  }
+  //   return await this.userRepository.save(user);
+  // }
 
   /**
    * Gets user by Telegram init data

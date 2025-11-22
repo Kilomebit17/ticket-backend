@@ -26,27 +26,27 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   /**
-   * Check if user exists - returns JWT token if exists, 401 if not
+   * Check if user exists - returns user if exists, 401 if not
    * GET /api/auth/me
    */
   @Get('me')
   async checkUser(@Headers('x-telegram-init-data') initData: string) {
-    const token = await this.authService.checkUser(initData);
-    return { token };
+    const user = await this.authService.checkUser(initData);
+    return { user };
   }
 
   /**
    * Register new user
    * POST /api/auth/register
    */
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  async register(
-    @Headers('x-telegram-init-data') initData: string,
-    @Body() registerDto: RegisterRequestDto,
-  ) {
-    const user = await this.authService.register(initData, registerDto);
-    return { user };
-  }
+  // @Post('register')
+  // @HttpCode(HttpStatus.CREATED)
+  // async register(
+  //   @Headers('x-telegram-init-data') initData: string,
+  //   @Body() registerDto: RegisterRequestDto,
+  // ) {
+  //   const user = await this.authService.register(initData, registerDto);
+  //   return { user };
+  // }
 }
 
