@@ -1,42 +1,47 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-  ManyToMany,
-  JoinTable,
-  OneToMany,
-} from 'typeorm';
-import { User } from './user.entity';
-import { Task } from './task.entity';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 
-@Entity('families')
+export type FamilyDocument = Family & Document;
+
+@Schema({ timestamps: true, collection: 'families' })
 export class Family {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  _id: Types.ObjectId;
 
-  @Column()
+  @Prop({ required: true })
   name: string;
 
-  @Column({ type: 'uuid' })
-  creatorId: string;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  creatorId: Types.ObjectId;
 
-  @ManyToMany(() => User, (user) => user.families)
-  @JoinTable({
-    name: 'family_members',
-    joinColumn: { name: 'familyId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
-  })
-  members: User[];
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
+  members: Types.ObjectId[];
 
-  @OneToMany(() => Task, (task) => task.family)
-  tasks: Task[];
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Task' }], default: [] })
+  tasks: Types.ObjectId[];
 
-  @CreateDateColumn()
   createdAt: Date;
-
-  @UpdateDateColumn()
   updatedAt: Date;
+
+  // Virtual for id (to match TypeORM behavior)
+  get id(): string {
+    return this._id.toString();
+  }
 }
 
+export const FamilySchema = SchemaFactory.createForClass(Family);
+
+// Add virtual id field
+FamilySchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
+// Ensure virtual fields are serialized
+FamilySchema.set('toJSON', {
+  virtuals: true,
+  transform: function (doc, ret: any) {
+    ret.id = ret._id?.toString() || ret._id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});

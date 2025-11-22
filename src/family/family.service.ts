@@ -4,11 +4,12 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Family } from '../entities/family.entity';
-import { FamilyInvite, FamilyInviteStatus } from '../entities/family-invite.entity';
-import { User } from '../entities/user.entity';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Family, FamilyDocument } from '../entities/family.entity';
+import { FamilyInvite, FamilyInviteStatus, FamilyInviteDocument } from '../entities/family-invite.entity';
+import { User, UserDocument } from '../entities/user.entity';
+import { Types } from 'mongoose';
 
 export interface CreateFamilyDto {
   name: string;
@@ -26,67 +27,96 @@ export interface RespondToInviteDto {
 @Injectable()
 export class FamilyService {
   constructor(
-    @InjectRepository(Family)
-    private readonly familyRepository: Repository<Family>,
-    @InjectRepository(FamilyInvite)
-    private readonly familyInviteRepository: Repository<FamilyInvite>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @InjectModel(Family.name)
+    private readonly familyModel: Model<FamilyDocument>,
+    @InjectModel(FamilyInvite.name)
+    private readonly familyInviteModel: Model<FamilyInviteDocument>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
   ) {}
 
   /**
    * Create a new family
    */
   async createFamily(userId: string, createDto: CreateFamilyDto): Promise<Family> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['families'],
-    });
+    const user = await this.userModel
+      .findById(userId)
+      .populate('families')
+      .exec();
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const family = this.familyRepository.create({
+    const family = new this.familyModel({
       name: createDto.name,
-      creatorId: userId,
-      members: [user],
+      creatorId: new Types.ObjectId(userId),
+      members: [new Types.ObjectId(userId)],
     });
 
-    return await this.familyRepository.save(family);
+    const savedFamily = await family.save();
+
+    // Add family to user's families array
+    if (!user.families) {
+      user.families = [];
+    }
+    user.families.push(savedFamily._id);
+    await user.save();
+
+    return savedFamily;
   }
 
   /**
    * Get user's families
    */
   async getUserFamilies(userId: string): Promise<Family[]> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['families', 'families.members', 'families.tasks'],
-    });
+    const user = await this.userModel
+      .findById(userId)
+      .populate({
+        path: 'families',
+        populate: [
+          { path: 'members' },
+          { path: 'tasks' },
+        ],
+      })
+      .exec();
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    return user.families || [];
+    // Return populated families (Mongoose populate returns full documents)
+    // When populated, families are Family documents, not ObjectIds
+    return (user.families as unknown as Family[]) || [];
   }
 
   /**
    * Get family by ID
    */
   async getFamilyById(familyId: string, userId: string): Promise<Family> {
-    const family = await this.familyRepository.findOne({
-      where: { id: familyId },
-      relations: ['members', 'tasks', 'tasks.creator', 'tasks.solver'],
-    });
+    const family = await this.familyModel
+      .findById(familyId)
+      .populate('members')
+      .populate({
+        path: 'tasks',
+        populate: [
+          { path: 'creatorId', model: 'User' },
+          { path: 'solverId', model: 'User' },
+        ],
+      })
+      .exec();
 
     if (!family) {
       throw new NotFoundException('Family not found');
     }
 
     // Check if user is a member
-    const isMember = family.members.some((member) => member.id === userId);
+    const userIdObj = new Types.ObjectId(userId);
+    const isMember = family.members.some((member: any) => {
+      const memberId = member instanceof Types.ObjectId ? member : member._id || member;
+      return memberId.equals(userIdObj);
+    });
+
     if (!isMember) {
       throw new ForbiddenException('You are not a member of this family');
     }
@@ -102,61 +132,65 @@ export class FamilyService {
     fromUserId: string,
     inviteDto: InviteToFamilyDto,
   ): Promise<FamilyInvite> {
-    const family = await this.familyRepository.findOne({
-      where: { id: familyId },
-      relations: ['members'],
-    });
+    const family = await this.familyModel
+      .findById(familyId)
+      .populate('members')
+      .exec();
 
     if (!family) {
       throw new NotFoundException('Family not found');
     }
 
     // Check if user is a member
-    const isMember = family.members.some((member) => member.id === fromUserId);
+    const fromUserIdObj = new Types.ObjectId(fromUserId);
+    const isMember = family.members.some((member: any) => {
+      const memberId = member instanceof Types.ObjectId ? member : member._id || member;
+      return memberId.equals(fromUserIdObj);
+    });
+
     if (!isMember) {
       throw new ForbiddenException('You are not a member of this family');
     }
 
     // Check if target user exists
-    const toUser = await this.userRepository.findOne({
-      where: { id: inviteDto.toUserId },
-    });
+    const toUser = await this.userModel.findById(inviteDto.toUserId).exec();
 
     if (!toUser) {
       throw new NotFoundException('Target user not found');
     }
 
     // Check if user is already a member
-    const isAlreadyMember = family.members.some(
-      (member) => member.id === inviteDto.toUserId,
-    );
+    const toUserIdObj = new Types.ObjectId(inviteDto.toUserId);
+    const isAlreadyMember = family.members.some((member: any) => {
+      const memberId = member instanceof Types.ObjectId ? member : member._id || member;
+      return memberId.equals(toUserIdObj);
+    });
+
     if (isAlreadyMember) {
       throw new BadRequestException('User is already a member of this family');
     }
 
     // Check if there's already a pending invite
-    const existingInvite = await this.familyInviteRepository.findOne({
-      where: {
-        familyId,
-        fromUserId,
-        toUserId: inviteDto.toUserId,
-        status: FamilyInviteStatus.PENDING,
-      },
-    });
+    const existingInvite = await this.familyInviteModel.findOne({
+      familyId: new Types.ObjectId(familyId),
+      fromUserId: new Types.ObjectId(fromUserId),
+      toUserId: new Types.ObjectId(inviteDto.toUserId),
+      status: FamilyInviteStatus.PENDING,
+    }).exec();
 
     if (existingInvite) {
       throw new BadRequestException('Invite already sent');
     }
 
     // Create invite
-    const invite = this.familyInviteRepository.create({
-      familyId,
-      fromUserId,
-      toUserId: inviteDto.toUserId,
+    const invite = new this.familyInviteModel({
+      familyId: new Types.ObjectId(familyId),
+      fromUserId: new Types.ObjectId(fromUserId),
+      toUserId: new Types.ObjectId(inviteDto.toUserId),
       status: FamilyInviteStatus.PENDING,
     });
 
-    return await this.familyInviteRepository.save(invite);
+    return await invite.save();
   }
 
   /**
@@ -166,17 +200,24 @@ export class FamilyService {
     sent: FamilyInvite[];
     received: FamilyInvite[];
   }> {
+    const userIdObj = new Types.ObjectId(userId);
+
     const [sent, received] = await Promise.all([
-      this.familyInviteRepository.find({
-        where: { fromUserId: userId },
-        relations: ['toUser', 'fromUser'],
-        order: { createdAt: 'DESC' },
-      }),
-      this.familyInviteRepository.find({
-        where: { toUserId: userId, status: FamilyInviteStatus.PENDING },
-        relations: ['fromUser', 'toUser'],
-        order: { createdAt: 'DESC' },
-      }),
+      this.familyInviteModel
+        .find({ fromUserId: userIdObj })
+        .populate('toUserId')
+        .populate('fromUserId')
+        .sort({ createdAt: -1 })
+        .exec(),
+      this.familyInviteModel
+        .find({
+          toUserId: userIdObj,
+          status: FamilyInviteStatus.PENDING,
+        })
+        .populate('fromUserId')
+        .populate('toUserId')
+        .sort({ createdAt: -1 })
+        .exec(),
     ]);
 
     return { sent, received };
@@ -189,16 +230,22 @@ export class FamilyService {
     userId: string,
     respondDto: RespondToInviteDto,
   ): Promise<FamilyInvite> {
-    const invite = await this.familyInviteRepository.findOne({
-      where: { id: respondDto.inviteId },
-      relations: ['fromUser', 'toUser'],
-    });
+    const invite = await this.familyInviteModel
+      .findById(respondDto.inviteId)
+      .populate('fromUserId')
+      .populate('toUserId')
+      .exec();
 
     if (!invite) {
       throw new NotFoundException('Invite not found');
     }
 
-    if (invite.toUserId !== userId) {
+    const userIdObj = new Types.ObjectId(userId);
+    const toUserIdObj = invite.toUserId instanceof Types.ObjectId 
+      ? invite.toUserId 
+      : new Types.ObjectId((invite.toUserId as any)._id || invite.toUserId);
+
+    if (!toUserIdObj.equals(userIdObj)) {
       throw new ForbiddenException('You are not authorized to respond to this invite');
     }
 
@@ -208,27 +255,49 @@ export class FamilyService {
 
     if (respondDto.accept) {
       // Add user to family
-      const family = await this.familyRepository.findOne({
-        where: { id: invite.familyId },
-        relations: ['members'],
-      });
+      const family = await this.familyModel
+        .findById(invite.familyId)
+        .populate('members')
+        .exec();
 
       if (!family) {
         throw new NotFoundException('Family not found');
       }
 
-      const toUser = await this.userRepository.findOne({
-        where: { id: invite.toUserId },
-      });
+      const toUser = await this.userModel.findById(userId).exec();
 
       if (!toUser) {
         throw new NotFoundException('User not found');
       }
 
       // Add user to family members
-      if (!family.members.some((member) => member.id === toUser.id)) {
-        family.members.push(toUser);
-        await this.familyRepository.save(family);
+      const toUserIdObj2 = new Types.ObjectId(userId);
+      const isAlreadyMember = family.members.some((member: any) => {
+        const memberId = member instanceof Types.ObjectId ? member : member._id || member;
+        return memberId.equals(toUserIdObj2);
+      });
+
+      if (!isAlreadyMember) {
+        family.members.push(toUserIdObj2);
+        await family.save();
+
+        // Add family to user's families array
+        if (!toUser.families) {
+          toUser.families = [];
+        }
+        const familyIdObj = invite.familyId instanceof Types.ObjectId 
+          ? invite.familyId 
+          : new Types.ObjectId((invite.familyId as any)._id || invite.familyId);
+        
+        const familyExists = toUser.families.some((f: any) => {
+          const fId = f instanceof Types.ObjectId ? f : f._id || f;
+          return fId.equals(familyIdObj);
+        });
+
+        if (!familyExists) {
+          toUser.families.push(familyIdObj);
+          await toUser.save();
+        }
       }
 
       invite.status = FamilyInviteStatus.ACCEPTED;
@@ -236,7 +305,6 @@ export class FamilyService {
       invite.status = FamilyInviteStatus.REJECTED;
     }
 
-    return await this.familyInviteRepository.save(invite);
+    return await invite.save();
   }
 }
-

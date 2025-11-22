@@ -1,13 +1,5 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
-import { User } from './user.entity';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum FamilyInviteStatus {
   PENDING = 'pending',
@@ -15,39 +7,51 @@ export enum FamilyInviteStatus {
   REJECTED = 'rejected',
 }
 
-@Entity('family_invites')
+export type FamilyInviteDocument = FamilyInvite & Document;
+
+@Schema({ timestamps: true, collection: 'family_invites' })
 export class FamilyInvite {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  _id: Types.ObjectId;
 
-  @Column({ type: 'uuid' })
-  fromUserId: string;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  fromUserId: Types.ObjectId;
 
-  @Column({ type: 'uuid' })
-  toUserId: string;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  toUserId: Types.ObjectId;
 
-  @Column({ type: 'uuid' })
-  familyId: string;
+  @Prop({ type: Types.ObjectId, ref: 'Family', required: true })
+  familyId: Types.ObjectId;
 
-  @Column({
-    type: 'enum',
+  @Prop({
+    type: String,
     enum: FamilyInviteStatus,
     default: FamilyInviteStatus.PENDING,
   })
   status: FamilyInviteStatus;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'fromUserId' })
-  fromUser: User;
-
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'toUserId' })
-  toUser: User;
-
-  @CreateDateColumn()
   createdAt: Date;
-
-  @UpdateDateColumn()
   updatedAt: Date;
+
+  // Virtual for id (to match TypeORM behavior)
+  get id(): string {
+    return this._id.toString();
+  }
 }
 
+export const FamilyInviteSchema = SchemaFactory.createForClass(FamilyInvite);
+
+// Add virtual id field
+FamilyInviteSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
+// Ensure virtual fields are serialized
+FamilyInviteSchema.set('toJSON', {
+  virtuals: true,
+  transform: function (doc, ret: any) {
+    ret.id = ret._id?.toString() || ret._id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});

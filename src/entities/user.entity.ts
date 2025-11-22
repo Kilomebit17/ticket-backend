@@ -1,81 +1,70 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-  ManyToMany,
-  JoinTable,
-  OneToMany,
-} from 'typeorm';
-import { Family } from './family.entity';
-import { FamilyInvite } from './family-invite.entity';
-import { Task } from './task.entity';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum Sex {
   MAN = 'man',
   WOMAN = 'woman',
 }
 
-@Entity('users')
-export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+export type UserDocument = User & Document;
 
-  @Column({ unique: true })
+@Schema({ timestamps: true, collection: 'users' })
+export class User {
+  _id: Types.ObjectId;
+
+  @Prop({ required: true, unique: true })
   telegramId: string;
 
-  @Column()
+  @Prop({ required: true })
   firstName: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Prop({ type: String, required: false })
   lastName: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Prop({ type: String, required: false })
   username: string | null;
 
-  @Column()
+  @Prop({ required: true })
   name: string;
 
-  @Column({
-    type: 'enum',
-    enum: Sex,
-  })
+  @Prop({ required: true, enum: Sex })
   sex: Sex;
 
-  @Column({ type: 'int', default: 0 })
+  @Prop({ type: Number, default: 0 })
   balance: number;
 
-  @Column({ type: 'text', nullable: true })
+  @Prop({ type: String, required: false })
   bio: string | null;
 
-  @Column({ type: 'text', nullable: true })
+  @Prop({ type: String, required: false })
   photoUrl: string | null;
 
-  @ManyToMany(() => Family, (family) => family.members)
-  @JoinTable({
-    name: 'family_members',
-    joinColumn: { name: 'userId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'familyId', referencedColumnName: 'id' },
-  })
-  families: Family[];
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Family' }], default: [] })
+  families: Types.ObjectId[];
 
-  @OneToMany(() => FamilyInvite, (invite) => invite.fromUser)
-  sentInvites: FamilyInvite[];
-
-  @OneToMany(() => FamilyInvite, (invite) => invite.toUser)
-  receivedInvites: FamilyInvite[];
-
-  @OneToMany(() => Task, (task) => task.creator)
-  createdTasks: Task[];
-
-  @OneToMany(() => Task, (task) => task.solver)
-  solvedTasks: Task[];
-
-  @CreateDateColumn()
   createdAt: Date;
-
-  @UpdateDateColumn()
   updatedAt: Date;
+
+  // Virtual for id (to match TypeORM behavior)
+  get id(): string {
+    return this._id.toString();
+  }
 }
 
+export const UserSchema = SchemaFactory.createForClass(User);
+
+// Add virtual id field
+UserSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
+// Ensure virtual fields are serialized
+UserSchema.set('toJSON', {
+  virtuals: true,
+  transform: function (doc, ret: any) {
+    ret.id = ret._id?.toString() || ret._id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});

@@ -1,15 +1,19 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { MongooseModule } from '@nestjs/mongoose';
 import { FamilyController } from './family.controller';
 import { FamilyService } from './family.service';
-import { Family } from '../entities/family.entity';
-import { FamilyInvite } from '../entities/family-invite.entity';
-import { User } from '../entities/user.entity';
+import { Family, FamilySchema } from '../entities/family.entity';
+import { FamilyInvite, FamilyInviteSchema } from '../entities/family-invite.entity';
+import { User, UserSchema } from '../entities/user.entity';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Family, FamilyInvite, User]),
+    MongooseModule.forFeature([
+      { name: Family.name, schema: FamilySchema },
+      { name: FamilyInvite.name, schema: FamilyInviteSchema },
+      { name: User.name, schema: UserSchema },
+    ]),
     AuthModule,
   ],
   controllers: [FamilyController],

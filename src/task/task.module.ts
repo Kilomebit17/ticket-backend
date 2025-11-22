@@ -1,16 +1,20 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { MongooseModule } from '@nestjs/mongoose';
 import { TaskController } from './task.controller';
 import { TaskService } from './task.service';
-import { Task } from '../entities/task.entity';
-import { User } from '../entities/user.entity';
-import { Family } from '../entities/family.entity';
+import { Task, TaskSchema } from '../entities/task.entity';
+import { User, UserSchema } from '../entities/user.entity';
+import { Family, FamilySchema } from '../entities/family.entity';
 import { TicketModule } from '../ticket/ticket.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Task, User, Family]),
+    MongooseModule.forFeature([
+      { name: Task.name, schema: TaskSchema },
+      { name: User.name, schema: UserSchema },
+      { name: Family.name, schema: FamilySchema },
+    ]),
     TicketModule,
     AuthModule,
   ],

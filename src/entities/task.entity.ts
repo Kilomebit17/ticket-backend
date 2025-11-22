@@ -1,14 +1,5 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
-import { User } from './user.entity';
-import { Family } from './family.entity';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum TaskStatus {
   CREATED = 'Created',
@@ -16,58 +7,66 @@ export enum TaskStatus {
   APPROVED = 'Approved',
 }
 
-@Entity('tasks')
-export class Task {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+export type TaskDocument = Task & Document;
 
-  @Column()
+@Schema({ timestamps: true, collection: 'tasks' })
+export class Task {
+  _id: Types.ObjectId;
+
+  @Prop({ required: true })
   name: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Prop({ type: String, required: false })
   description: string | null;
 
-  @Column({ type: 'int' })
+  @Prop({ type: Number, required: true })
   price: number;
 
-  @Column({
-    type: 'enum',
+  @Prop({
+    type: String,
     enum: TaskStatus,
     default: TaskStatus.CREATED,
   })
   status: TaskStatus;
 
-  @Column({ type: 'uuid' })
-  familyId: string;
+  @Prop({ type: Types.ObjectId, ref: 'Family', required: true })
+  familyId: Types.ObjectId;
 
-  @Column({ type: 'uuid' })
-  creatorId: string;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  creatorId: Types.ObjectId;
 
-  @Column({ type: 'uuid', nullable: true })
-  solverId: string | null;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  solverId: Types.ObjectId | null;
 
-  @ManyToOne(() => Family, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'familyId' })
-  family: Family;
-
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'creatorId' })
-  creator: User;
-
-  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'solverId' })
-  solver: User | null;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @Column({ type: 'timestamp', nullable: true })
+  @Prop({ type: Date, required: false })
   solvedAt: Date | null;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Prop({ type: Date, required: false })
   approvedAt: Date | null;
 
-  @UpdateDateColumn()
+  createdAt: Date;
   updatedAt: Date;
+
+  // Virtual for id (to match TypeORM behavior)
+  get id(): string {
+    return this._id.toString();
+  }
 }
 
+export const TaskSchema = SchemaFactory.createForClass(Task);
+
+// Add virtual id field
+TaskSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
+// Ensure virtual fields are serialized
+TaskSchema.set('toJSON', {
+  virtuals: true,
+  transform: function (doc, ret: any) {
+    ret.id = ret._id?.toString() || ret._id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});

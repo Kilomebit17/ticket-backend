@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import { User } from '../entities/user.entity';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User, UserDocument } from '../entities/user.entity';
+import { Types } from 'mongoose';
 
 export interface UpdateUserInfoDto {
   name?: string;
@@ -16,18 +17,18 @@ export interface UserBoardDto {
 @Injectable()
 export class UserService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
   ) {}
 
   /**
    * Get user by ID
    */
   async getUserById(userId: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['families'],
-    });
+    const user = await this.userModel
+      .findById(userId)
+      .populate('families')
+      .exec();
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -40,16 +41,18 @@ export class UserService {
    * Get user by Telegram ID
    */
   async getUserByTelegramId(telegramId: string): Promise<User | null> {
-    return await this.userRepository.findOne({
-      where: { telegramId },
-    });
+    return await this.userModel.findOne({ telegramId }).exec();
   }
 
   /**
    * Update user info
    */
   async updateUserInfo(userId: string, updateDto: UpdateUserInfoDto): Promise<User> {
-    const user = await this.getUserById(userId);
+    const user = await this.userModel.findById(userId).exec();
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
 
     if (updateDto.name !== undefined) {
       user.name = updateDto.name;
@@ -61,7 +64,7 @@ export class UserService {
       user.photoUrl = updateDto.photoUrl;
     }
 
-    return await this.userRepository.save(user);
+    return await user.save();
   }
 
   /**
@@ -72,12 +75,12 @@ export class UserService {
       return [];
     }
 
-    const users = await this.userRepository.find({
-      where: {
-        telegramId: In(telegramIds),
-      },
-      relations: ['families'],
-    });
+    const users = await this.userModel
+      .find({
+        telegramId: { $in: telegramIds },
+      })
+      .populate('families')
+      .exec();
 
     return users;
   }
@@ -93,4 +96,3 @@ export class UserService {
     return user;
   }
 }
-

@@ -1,25 +1,24 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { User } from '../entities/user.entity';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
+import { User, UserDocument } from '../entities/user.entity';
 
 @Injectable()
 export class TicketService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    @InjectDataSource()
-    private readonly dataSource: DataSource,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
+    @InjectConnection()
+    private readonly connection: Connection,
   ) {}
 
   /**
    * Get user balance
    */
   async getUserBalance(userId: string): Promise<number> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
+    const user = await this.userModel.findById(userId).exec();
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -36,29 +35,31 @@ export class TicketService {
       throw new BadRequestException('Amount must be positive');
     }
 
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
+    // Use MongoDB session for transaction
+    const session = await this.connection.startSession();
+    session.startTransaction();
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    try {
+      const user = await this.userModel
+        .findById(userId)
+        .session(session)
+        .exec();
 
-    // Use transaction to ensure atomicity
-    return await this.dataSource.transaction(async (manager) => {
-      const userRepo = manager.getRepository(User);
-      const updatedUser = await userRepo.findOne({
-        where: { id: userId },
-        lock: { mode: 'pessimistic_write' },
-      });
-
-      if (!updatedUser) {
+      if (!user) {
         throw new NotFoundException('User not found');
       }
 
-      updatedUser.balance += amount;
-      return await userRepo.save(updatedUser);
-    });
+      user.balance += amount;
+      const updatedUser = await user.save({ session });
+
+      await session.commitTransaction();
+      return updatedUser;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   /**
@@ -69,33 +70,34 @@ export class TicketService {
       throw new BadRequestException('Amount must be positive');
     }
 
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
+    // Use MongoDB session for transaction
+    const session = await this.connection.startSession();
+    session.startTransaction();
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    try {
+      const user = await this.userModel
+        .findById(userId)
+        .session(session)
+        .exec();
 
-    // Use transaction to ensure atomicity
-    return await this.dataSource.transaction(async (manager) => {
-      const userRepo = manager.getRepository(User);
-      const updatedUser = await userRepo.findOne({
-        where: { id: userId },
-        lock: { mode: 'pessimistic_write' },
-      });
-
-      if (!updatedUser) {
+      if (!user) {
         throw new NotFoundException('User not found');
       }
 
-      if (updatedUser.balance < amount) {
+      if (user.balance < amount) {
         throw new BadRequestException('Insufficient balance');
       }
 
-      updatedUser.balance -= amount;
-      return await userRepo.save(updatedUser);
-    });
+      user.balance -= amount;
+      const updatedUser = await user.save({ session });
+
+      await session.commitTransaction();
+      return updatedUser;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 }
-
