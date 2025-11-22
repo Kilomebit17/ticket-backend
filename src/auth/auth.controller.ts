@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Headers,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Headers, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import type { RegisterDto } from './auth.service';
 import { IsString, IsEnum, IsNotEmpty } from 'class-validator';
@@ -39,14 +31,15 @@ export class AuthController {
    * Register new user
    * POST /api/auth/register
    */
-  // @Post('register')
-  // @HttpCode(HttpStatus.CREATED)
-  // async register(
-  //   @Headers('x-telegram-init-data') initData: string,
-  //   @Body() registerDto: RegisterRequestDto,
-  // ) {
-  //   const user = await this.authService.register(initData, registerDto);
-  //   return { user };
-  // }
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  async register(
+    @Headers('x-telegram-init-data') initData: string,
+    @Body() registerDto: RegisterRequestDto,
+  ) {
+    console.log('registerDto', registerDto);
+    return { message: 'User registered' };
+    // const user = await this.authService.register(initData, registerDto);
+    // return { user };
+  }
 }
-
