@@ -6,7 +6,6 @@ import { UserModule } from './user/user.module';
 import { FamilyModule } from './family/family.module';
 import { TaskModule } from './task/task.module';
 import { TicketModule } from './ticket/ticket.module';
-import { TestModule } from './test/test.module';
 import { DatabaseConfig } from './config/database.config';
 
 @Module({
@@ -23,7 +22,6 @@ import { DatabaseConfig } from './config/database.config';
     FamilyModule,
     TaskModule,
     TicketModule,
-    TestModule,
   ],
 })
 export class AppModule {}
