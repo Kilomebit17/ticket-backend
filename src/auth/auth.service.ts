@@ -23,39 +23,46 @@ export class AuthService {
    * Validates Telegram init data and returns user if exists
    */
   async checkUser(initDataHeader: string | undefined): Promise<User | null> {
-    const botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN') || process.env.TELEGRAM_BOT_TOKEN;
+    const botToken =
+      this.configService.get<string>('TELEGRAM_BOT_TOKEN') ||
+      process.env.TELEGRAM_BOT_TOKEN;
+  
     if (!botToken) {
-      throw new Error('TELEGRAM_BOT_TOKEN is not configured in environment variables');
+      throw new Error('TELEGRAM_BOT_TOKEN is not configured');
     }
-
+  
     const initDataRaw = extractInitDataFromHeader(initDataHeader);
+  
     if (!initDataRaw) {
-      console.error('Auth checkUser: No init data received', { header: initDataHeader });
+      console.error('Auth checkUser: No init data', {
+        header: initDataHeader,
+      });
       throw new UnauthorizedException('Telegram init data is required');
     }
-
+  
     console.log('Auth checkUser: Validating init data', {
       initDataLength: initDataRaw.length,
-      initDataPreview: initDataRaw.substring(0, 100),
-      hasBotToken: !!botToken,
+      initDataHead: initDataRaw.substring(0, 120),
+      initDataTail: initDataRaw.substring(initDataRaw.length - 120),
     });
-
+  
     const validatedData = validateTelegramInitData(initDataRaw, botToken);
-    if (!validatedData || !validatedData.user) {
+  
+    if (!validatedData?.user) {
       console.error('Auth checkUser: Validation failed', {
-        hasValidatedData: !!validatedData,
+        validatedData,
         hasUser: !!validatedData?.user,
       });
       throw new UnauthorizedException('Invalid Telegram init data');
     }
-
+  
     const telegramId = validatedData.user.id;
-    const user = await this.userRepository.findOne({
+  
+    return await this.userRepository.findOne({
       where: { telegramId },
     });
-
-    return user || null;
   }
+  
 
   /**
    * Registers a new user with Telegram init data
