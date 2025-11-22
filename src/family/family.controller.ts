@@ -60,19 +60,6 @@ export class FamilyController {
   }
 
   /**
-   * Get family by ID
-   * GET /api/family/:id
-   */
-  @Get(':id')
-  async getFamilyById(
-    @Param('id') familyId: string,
-    @CurrentUser() user: User,
-  ) {
-    const family = await this.familyService.getFamilyById(familyId, user.id);
-    return { family };
-  }
-
-  /**
    * Get user's invites
    * GET /api/family/invites
    */
@@ -93,6 +80,19 @@ export class FamilyController {
   ) {
     const invite = await this.familyService.respondToInvite(user.id, respondDto);
     return { invite };
+  }
+
+  /**
+   * Get family by ID
+   * GET /api/family/:id
+   */
+  @Get(':id')
+  async getFamilyById(
+    @Param('id') familyId: string,
+    @CurrentUser() user: User,
+  ) {
+    const family = await this.familyService.getFamilyById(familyId, user.id);
+    return { family };
   }
 }
 
