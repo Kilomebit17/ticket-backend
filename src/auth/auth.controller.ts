@@ -6,7 +6,6 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
-  NotFoundException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import type { RegisterDto } from './auth.service';
@@ -27,16 +26,13 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   /**
-   * Check if user exists - returns user if exists, 404 if not
+   * Check if user exists - returns JWT token if exists, 401 if not
    * GET /api/auth/me
    */
   @Get('me')
   async checkUser(@Headers('x-telegram-init-data') initData: string) {
-    const user = await this.authService.checkUser(initData);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    return { user };
+    const token = await this.authService.checkUser(initData);
+    return { token };
   }
 
   /**
