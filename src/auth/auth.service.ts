@@ -31,6 +31,7 @@ export class AuthService {
       throw new Error('TELEGRAM_BOT_TOKEN is not configured');
     }
 
+    console.log('Auth checkUser: Validating init data', { initData, botToken });
     const initDataRaw = isValid(initData, botToken);
 
     if (!initDataRaw) {
