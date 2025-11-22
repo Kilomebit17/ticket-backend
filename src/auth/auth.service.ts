@@ -1,10 +1,10 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import { User, Sex, UserDocument } from '../entities/user.entity';
 import { extractInitDataFromHeader } from '../utils/telegram.util';
-import { parse, validate, isValid } from '@tma.js/init-data-node';
+import { parse, validate } from '@tma.js/init-data-node';
 
 export interface RegisterDto {
   name: string;
@@ -31,18 +31,6 @@ export class AuthService {
       throw new Error('TELEGRAM_BOT_TOKEN is not configured');
     }
 
-    // console.log('Auth checkUser: Validating init data', { initData, botToken });
-    // const initDataRaw = isValid(decodeURIComponent(initData), botToken);
-
-    // if (!initDataRaw) {
-    //   console.error('Auth checkUser: No init data', { header: initData });
-    //   throw new UnauthorizedException('Telegram init data is required');
-    // }
-
-    // Парсим initData и достаем Telegram ID пользователя
-    const initDataRaw = parse(initData);
-    console.log('initDataRaw parsed user', initDataRaw.user);
-
     const tgId = parse(initData).user?.id;
 
     if (!tgId) {
@@ -52,7 +40,6 @@ export class AuthService {
     // Telegram ID
     const telegramId = String(tgId);
 
-    // Check if user exists in DB
     const user = await this.userModel.findOne({
       telegramId,
     }).exec();
@@ -65,9 +52,11 @@ export class AuthService {
   }
 
   /**
-   * Gets user by Telegram init data
+   * Registers a new user from Telegram init data
+   * Validates init data, checks if user already exists, and creates new user
+   * Returns created user or throws error if user already exists
    */
-  async getUserByInitData(initDataHeader: string | undefined): Promise<User> {
+  async register(initData: string, registerDto: RegisterDto): Promise<User> {
     const botToken =
       this.configService.get<string>('TELEGRAM_BOT_TOKEN') || process.env.TELEGRAM_BOT_TOKEN;
 
@@ -75,40 +64,50 @@ export class AuthService {
       throw new Error('TELEGRAM_BOT_TOKEN is not configured');
     }
 
-    const initDataRaw = extractInitDataFromHeader(initDataHeader);
-
-    if (!initDataRaw) {
-      throw new UnauthorizedException('Telegram init data is required');
-    }
-
-    // Parse and validate init data
+    // Validate init data
     let parsed;
     try {
-      parsed = parse(initDataRaw);
-      // Disable expiration check (client handles expiration)
-      validate(initDataRaw, botToken, { expiresIn: 0 });
+      parsed = parse(initData);
+      validate(initData, botToken, { expiresIn: 0 });
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e);
-      console.error('Auth getUserByInitData: Validation failed', {
+      console.error('Auth register: Validation failed', {
         error: errorMessage,
-        initDataLength: initDataRaw.length,
+        initDataLength: initData.length,
       });
-      throw new UnauthorizedException('Invalid Telegram init data');
+      throw new BadRequestException('AUTH__INVALID_INITDATA');
     }
 
     if (!parsed.user) {
-      throw new UnauthorizedException('No Telegram user data provided');
+      throw new BadRequestException('AUTH__INVALID_INITDATA');
     }
 
     const telegramId = String(parsed.user.id);
-    const user = await this.userModel.findOne({
+
+    // Check if user already exists
+    const existingUser = await this.userModel.findOne({
       telegramId,
     }).exec();
 
-    if (!user) {
-      throw new UnauthorizedException('User not found');
+    if (existingUser) {
+      throw new ConflictException('User already exists');
     }
 
-    return user;
+    // Create new user
+    const newUser = new this.userModel({
+      telegramId,
+      firstName: parsed.user.first_name,
+      lastName: parsed.user.last_name || null,
+      username: parsed.user.username || null,
+      name: registerDto.name,
+      sex: registerDto.sex,
+      photoUrl: parsed.user.photo_url || null,
+      balance: 0,
+      bio: null,
+      families: [],
+    });
+
+    const savedUser = await newUser.save();
+    return savedUser;
   }
 }

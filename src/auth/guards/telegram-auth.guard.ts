@@ -24,7 +24,7 @@ export class TelegramAuthGuard implements CanActivate {
     }
 
     try {
-      const user = await this.authService.getUserByInitData(initData);
+      const user = await this.authService.checkUser(initData);
       request.user = user;
       return true;
     } catch (error) {
