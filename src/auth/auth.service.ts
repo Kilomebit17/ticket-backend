@@ -41,7 +41,7 @@ export class AuthService {
 
     // Парсим initData и достаем Telegram ID пользователя
     const initDataRaw = parse(initData);
-    console.log('initDataRaw parsed', initDataRaw);
+    console.log('initDataRaw parsed user', initDataRaw.user);
 
     const tgId = parse(initData).user?.id;
 
