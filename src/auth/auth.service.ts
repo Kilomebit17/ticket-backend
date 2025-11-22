@@ -65,18 +65,8 @@ export class AuthService {
     }
 
     // Validate init data
-    let parsed;
-    try {
-      parsed = parse(initData);
-      validate(initData, botToken, { expiresIn: 0 });
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      console.error('Auth register: Validation failed', {
-        error: errorMessage,
-        initDataLength: initData.length,
-      });
-      throw new BadRequestException('AUTH__INVALID_INITDATA');
-    }
+    const parsed = parse(initData)
+    
 
     if (!parsed.user) {
       throw new BadRequestException('AUTH__INVALID_INITDATA');

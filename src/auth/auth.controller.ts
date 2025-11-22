@@ -37,9 +37,7 @@ export class AuthController {
     @Headers('x-telegram-init-data') initData: string,
     @Body() registerDto: RegisterRequestDto,
   ) {
-    console.log('registerDto', registerDto);
-    return { message: 'User registered' };
-    // const user = await this.authService.register(initData, registerDto);
-    // return { user };
+    const user = await this.authService.register(initData, registerDto);
+    return { user };
   }
 }
