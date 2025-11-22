@@ -11,16 +11,16 @@ import { FamilyService, InviteToFamilyDto, RespondToInviteDto } from './family.s
 import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../entities/user.entity';
-import { IsString, IsNotEmpty, IsBoolean, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsBoolean, IsMongoId } from 'class-validator';
 
 class InviteToFamilyRequestDto implements InviteToFamilyDto {
-  @IsUUID()
+  @IsMongoId()
   @IsNotEmpty()
   toUserId: string;
 }
 
 class RespondToInviteRequestDto implements RespondToInviteDto {
-  @IsUUID()
+  @IsMongoId()
   @IsNotEmpty()
   inviteId: string;
 
