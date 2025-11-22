@@ -5,6 +5,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { UserService, UpdateUserInfoDto, UserBoardDto } from './user.service';
@@ -60,6 +61,19 @@ export class UserController {
   ) {
     const updatedUser = await this.userService.updateUserInfo(user.id, updateDto);
     return { user: updatedUser };
+  }
+
+  /**
+   * Search user by Telegram username
+   * GET /api/user/search?username=username
+   */
+  @Get('search')
+  async searchByUsername(@Query('username') username: string) {
+    if (!username) {
+      return { user: null };
+    }
+    const user = await this.userService.getUserByTelegramUsername(username);
+    return { user };
   }
 
   /**

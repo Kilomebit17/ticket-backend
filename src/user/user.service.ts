@@ -45,6 +45,18 @@ export class UserService {
   }
 
   /**
+   * Get user by Telegram username
+   */
+  async getUserByTelegramUsername(username: string): Promise<User | null> {
+    if (!username) {
+      return null;
+    }
+    // Remove @ if present
+    const cleanUsername = username.startsWith('@') ? username.slice(1) : username;
+    return await this.userModel.findOne({ username: cleanUsername }).exec();
+  }
+
+  /**
    * Update user info
    */
   async updateUserInfo(userId: string, updateDto: UpdateUserInfoDto): Promise<User> {
