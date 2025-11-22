@@ -16,7 +16,7 @@ import { TicketModule } from './ticket/ticket.module';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGODB_URI')
+        uri: configService.get<string>('MONGO_URL')
       }),
       inject: [ConfigService],
     }),
