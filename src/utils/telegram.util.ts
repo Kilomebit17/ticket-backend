@@ -44,7 +44,11 @@ export function validateTelegramInitData(
     // Remove both hash and signature before building data check string
     const paramsForValidation = new URLSearchParams();
     for (const [key, value] of urlParams.entries()) {
-      if (key !== 'hash' && key !== 'signature') {
+      if (key === 'hash' || key === 'signature') continue;
+
+      if (key === 'user') {
+        paramsForValidation.append(key, decodeURIComponent(value));
+      } else {
         paramsForValidation.append(key, value);
       }
     }
