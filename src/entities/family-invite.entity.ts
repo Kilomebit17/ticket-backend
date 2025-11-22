@@ -19,8 +19,8 @@ export class FamilyInvite {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   toUserId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Family', required: true })
-  familyId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'Family', required: false })
+  familyId: Types.ObjectId | null;
 
   @Prop({
     type: String,

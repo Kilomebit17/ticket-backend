@@ -7,17 +7,11 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
-import { FamilyService, CreateFamilyDto, InviteToFamilyDto, RespondToInviteDto } from './family.service';
+import { FamilyService, InviteToFamilyDto, RespondToInviteDto } from './family.service';
 import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../entities/user.entity';
 import { IsString, IsNotEmpty, IsBoolean, IsUUID } from 'class-validator';
-
-class CreateFamilyRequestDto implements CreateFamilyDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-}
 
 class InviteToFamilyRequestDto implements InviteToFamilyDto {
   @IsUUID()
@@ -40,19 +34,6 @@ export class FamilyController {
   constructor(private readonly familyService: FamilyService) {}
 
   /**
-   * Create a new family
-   * POST /api/family
-   */
-  @Post()
-  async createFamily(
-    @CurrentUser() user: User,
-    @Body() createDto: CreateFamilyRequestDto,
-  ) {
-    const family = await this.familyService.createFamily(user.id, createDto);
-    return { family };
-  }
-
-  /**
    * Get user's families
    * GET /api/family
    */
@@ -60,6 +41,22 @@ export class FamilyController {
   async getUserFamilies(@CurrentUser() user: User) {
     const families = await this.familyService.getUserFamilies(user.id);
     return { families };
+  }
+
+  /**
+   * Invite user to create family (family will be created when invite is accepted)
+   * POST /api/family/invite
+   */
+  @Post('invite')
+  async inviteToFamily(
+    @CurrentUser() user: User,
+    @Body() inviteDto: InviteToFamilyRequestDto,
+  ) {
+    const invite = await this.familyService.inviteToFamily(
+      user.id,
+      inviteDto,
+    );
+    return { invite };
   }
 
   /**
@@ -73,24 +70,6 @@ export class FamilyController {
   ) {
     const family = await this.familyService.getFamilyById(familyId, user.id);
     return { family };
-  }
-
-  /**
-   * Invite user to family
-   * POST /api/family/:id/invite
-   */
-  @Post(':id/invite')
-  async inviteToFamily(
-    @Param('id') familyId: string,
-    @CurrentUser() user: User,
-    @Body() inviteDto: InviteToFamilyRequestDto,
-  ) {
-    const invite = await this.familyService.inviteToFamily(
-      familyId,
-      user.id,
-      inviteDto,
-    );
-    return { invite };
   }
 
   /**
