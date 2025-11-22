@@ -64,16 +64,16 @@ export class UserController {
   }
 
   /**
-   * Search user by Telegram username
+   * Search users by Telegram username (supports partial matching)
    * GET /api/user/search?username=username
    */
   @Get('search')
   async searchByUsername(@Query('username') username: string) {
     if (!username) {
-      return { user: null };
+      return { users: [] };
     }
-    const user = await this.userService.getUserByTelegramUsername(username);
-    return { user };
+    const users = await this.userService.getUserByTelegramUsername(username);
+    return { users };
   }
 
   /**

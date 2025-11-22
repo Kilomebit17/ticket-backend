@@ -45,15 +45,18 @@ export class UserService {
   }
 
   /**
-   * Get user by Telegram username
+   * Get users by Telegram username (supports partial matching)
    */
-  async getUserByTelegramUsername(username: string): Promise<User | null> {
+  async getUserByTelegramUsername(username: string): Promise<User[]> {
     if (!username) {
-      return null;
+      return [];
     }
     // Remove @ if present
     const cleanUsername = username.startsWith('@') ? username.slice(1) : username;
-    return await this.userModel.findOne({ username: cleanUsername }).exec();
+    // Use regex for case-insensitive partial matching
+    return await this.userModel
+      .find({ username: { $regex: cleanUsername, $options: 'i' } })
+      .exec();
   }
 
   /**
