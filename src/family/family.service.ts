@@ -199,6 +199,25 @@ export class FamilyService {
   }
 
   /**
+   * Helper to extract ObjectId from populated or non-populated field
+   */
+  private extractObjectId(value: any): Types.ObjectId {
+    if (value instanceof Types.ObjectId) {
+      return value;
+    }
+    if (value?._id) {
+      return value._id instanceof Types.ObjectId ? value._id : new Types.ObjectId(value._id);
+    }
+    if (value?.id) {
+      return new Types.ObjectId(value.id);
+    }
+    if (typeof value === 'string') {
+      return new Types.ObjectId(value);
+    }
+    throw new Error('Cannot extract ObjectId from value');
+  }
+
+  /**
    * Respond to invite (accept or reject)
    */
   async respondToInvite(
@@ -216,9 +235,7 @@ export class FamilyService {
     }
 
     const userIdObj = new Types.ObjectId(userId);
-    const toUserIdObj = invite.toUserId instanceof Types.ObjectId 
-      ? invite.toUserId 
-      : new Types.ObjectId((invite.toUserId as any)._id || invite.toUserId);
+    const toUserIdObj = this.extractObjectId(invite.toUserId);
 
     if (!toUserIdObj.equals(userIdObj)) {
       throw new ForbiddenException('You are not authorized to respond to this invite');
@@ -235,9 +252,7 @@ export class FamilyService {
         throw new NotFoundException('User not found');
       }
 
-      const fromUserIdObj = invite.fromUserId instanceof Types.ObjectId 
-        ? invite.fromUserId 
-        : new Types.ObjectId((invite.fromUserId as any)._id || invite.fromUserId);
+      const fromUserIdObj = this.extractObjectId(invite.fromUserId);
 
       const fromUser = await this.userModel.findById(fromUserIdObj).exec();
 
@@ -293,8 +308,9 @@ export class FamilyService {
         invite.familyId = familyIdObj;
       } else {
         // Add user to existing family
+        const familyIdObj = this.extractObjectId(invite.familyId);
         const family = await this.familyModel
-          .findById(invite.familyId)
+          .findById(familyIdObj)
           .populate('members')
           .exec();
 
@@ -317,9 +333,6 @@ export class FamilyService {
           if (!toUser.families) {
             toUser.families = [];
           }
-          const familyIdObj = invite.familyId instanceof Types.ObjectId 
-            ? invite.familyId 
-            : new Types.ObjectId((invite.familyId as any)._id || invite.familyId);
           
           const familyExists = toUser.families.some((f: any) => {
             const fId = f instanceof Types.ObjectId ? f : f._id || f;
