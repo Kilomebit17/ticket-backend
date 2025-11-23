@@ -1,18 +1,8 @@
 import { Controller, Get, Post, Body, Headers, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import type { RegisterDto } from './auth.service';
-import { IsString, IsEnum, IsNotEmpty } from 'class-validator';
-import { Sex, UserDocument } from '../entities/user.entity';
+import { RegisterRequestDto } from './dto/register.dto';
+import { UserDocument } from '../entities/user.entity';
 import { Types } from 'mongoose';
-
-class RegisterRequestDto implements RegisterDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsEnum(Sex)
-  sex: Sex;
-}
 
 @Controller('auth')
 export class AuthController {

@@ -3,16 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../entities/user.entity';
 import { Types } from 'mongoose';
-
-export interface UpdateUserInfoDto {
-  name?: string;
-  bio?: string;
-  photoUrl?: string;
-}
-
-export interface UserBoardDto {
-  telegramIds: string[];
-}
+import { UpdateUserInfoDto } from './dto/update-user-info.dto';
+import { UserBoardDto } from './dto/user-board.dto';
 
 @Injectable()
 export class UserService {

@@ -2,14 +2,10 @@ import { Injectable, UnauthorizedException, BadRequestException, ConflictExcepti
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
-import { User, Sex, UserDocument } from '../entities/user.entity';
+import { User, UserDocument } from '../entities/user.entity';
 import { extractInitDataFromHeader } from '../utils/telegram.util';
 import { parse, validate } from '@tma.js/init-data-node';
-
-export interface RegisterDto {
-  name: string;
-  sex: Sex;
-}
+import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {

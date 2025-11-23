@@ -7,26 +7,12 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
-import { FamilyService, InviteToFamilyDto, RespondToInviteDto } from './family.service';
+import { FamilyService } from './family.service';
 import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../entities/user.entity';
-import { IsString, IsNotEmpty, IsBoolean, IsMongoId } from 'class-validator';
-
-class InviteToFamilyRequestDto implements InviteToFamilyDto {
-  @IsMongoId()
-  @IsNotEmpty()
-  toUserId: string;
-}
-
-class RespondToInviteRequestDto implements RespondToInviteDto {
-  @IsMongoId()
-  @IsNotEmpty()
-  inviteId: string;
-
-  @IsBoolean()
-  accept: boolean;
-}
+import { InviteToFamilyRequestDto } from './dto/invite-to-family.dto';
+import { RespondToInviteRequestDto } from './dto/respond-to-invite.dto';
 
 @Controller('family')
 @UseGuards(TelegramAuthGuard)

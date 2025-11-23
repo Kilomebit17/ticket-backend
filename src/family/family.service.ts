@@ -10,19 +10,9 @@ import { Family, FamilyDocument } from '../entities/family.entity';
 import { FamilyInvite, FamilyInviteStatus, FamilyInviteDocument } from '../entities/family-invite.entity';
 import { User, UserDocument } from '../entities/user.entity';
 import { Types } from 'mongoose';
-
-export interface CreateFamilyDto {
-  name: string;
-}
-
-export interface InviteToFamilyDto {
-  toUserId: string;
-}
-
-export interface RespondToInviteDto {
-  inviteId: string;
-  accept: boolean;
-}
+import { CreateFamilyDto } from './dto/create-family.dto';
+import { InviteToFamilyDto } from './dto/invite-to-family.dto';
+import { RespondToInviteDto } from './dto/respond-to-invite.dto';
 
 @Injectable()
 export class FamilyService {

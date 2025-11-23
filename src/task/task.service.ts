@@ -13,21 +13,9 @@ import { User, UserDocument } from '../entities/user.entity';
 import { Family, FamilyDocument } from '../entities/family.entity';
 import { TicketService } from '../ticket/ticket.service';
 import { Types } from 'mongoose';
-
-export interface CreateTaskDto {
-  familyId: string;
-  name: string;
-  description?: string;
-  price: number;
-}
-
-export interface PerformTaskDto {
-  taskId: string;
-}
-
-export interface ApproveTaskDto {
-  taskId: string;
-}
+import { CreateTaskDto } from './dto/create-task.dto';
+import { PerformTaskDto } from './dto/perform-task.dto';
+import { ApproveTaskDto } from './dto/approve-task.dto';
 
 @Injectable()
 export class TaskService {
@@ -49,17 +37,6 @@ export class TaskService {
   async createTask(userId: string, createDto: CreateTaskDto): Promise<Task> {
     if (createDto.price <= 0) {
       throw new BadRequestException('Task price must be positive');
-    }
-
-    // Check if user has sufficient balance
-    const user = await this.userModel.findById(userId).exec();
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    if (user.balance < createDto.price) {
-      throw new BadRequestException('Insufficient balance to create task');
     }
 
     // Check if family exists and user is a member

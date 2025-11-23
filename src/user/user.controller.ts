@@ -8,32 +8,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { UserService, UpdateUserInfoDto, UserBoardDto } from './user.service';
+import { UserService } from './user.service';
 import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../entities/user.entity';
-import { IsString, IsOptional, IsArray, IsNotEmpty } from 'class-validator';
-
-class UpdateUserInfoRequestDto implements UpdateUserInfoDto {
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @IsString()
-  @IsOptional()
-  bio?: string;
-
-  @IsString()
-  @IsOptional()
-  photoUrl?: string;
-}
-
-class UserBoardRequestDto implements UserBoardDto {
-  @IsArray()
-  @IsString({ each: true })
-  @IsNotEmpty()
-  telegramIds: string[];
-}
+import { UpdateUserInfoRequestDto } from './dto/update-user-info.dto';
+import { UserBoardRequestDto } from './dto/user-board.dto';
 
 @Controller('user')
 @UseGuards(TelegramAuthGuard)

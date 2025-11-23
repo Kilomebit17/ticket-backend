@@ -7,41 +7,13 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
-import { TaskService, CreateTaskDto, PerformTaskDto, ApproveTaskDto } from './task.service';
+import { TaskService } from './task.service';
 import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../entities/user.entity';
-import { IsString, IsNotEmpty, IsInt, IsOptional, Min } from 'class-validator';
-
-class CreateTaskRequestDto implements CreateTaskDto {
-  @IsString()
-  @IsNotEmpty()
-  familyId: string;
-
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @IsInt()
-  @Min(1)
-  price: number;
-}
-
-class PerformTaskRequestDto implements PerformTaskDto {
-  @IsString()
-  @IsNotEmpty()
-  taskId: string;
-}
-
-class ApproveTaskRequestDto implements ApproveTaskDto {
-  @IsString()
-  @IsNotEmpty()
-  taskId: string;
-}
+import { CreateTaskRequestDto } from './dto/create-task.dto';
+import { PerformTaskRequestDto } from './dto/perform-task.dto';
+import { ApproveTaskRequestDto } from './dto/approve-task.dto';
 
 @Controller('task')
 @UseGuards(TelegramAuthGuard)
