@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseGuards } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -25,10 +17,7 @@ export class TaskController {
    * POST /api/task
    */
   @Post()
-  async createTask(
-    @CurrentUser() user: User,
-    @Body() createDto: CreateTaskRequestDto,
-  ) {
+  async createTask(@CurrentUser() user: User, @Body() createDto: CreateTaskRequestDto) {
     const task = await this.taskService.createTask(user.id, createDto);
     return { task };
   }
@@ -40,7 +29,7 @@ export class TaskController {
   @Get('my')
   async getMyTasks(@CurrentUser() user: User) {
     const tasks = await this.taskService.getUserTasks(user.id);
-    return tasks;
+    return { tasks };
   }
 
   /**
@@ -48,10 +37,7 @@ export class TaskController {
    * GET /api/task/family/:familyId
    */
   @Get('family/:familyId')
-  async getFamilyTasks(
-    @Param('familyId') familyId: string,
-    @CurrentUser() user: User,
-  ) {
+  async getFamilyTasks(@Param('familyId') familyId: string, @CurrentUser() user: User) {
     const tasks = await this.taskService.getFamilyTasks(familyId, user.id);
     return { tasks };
   }
@@ -61,10 +47,7 @@ export class TaskController {
    * GET /api/task/:id
    */
   @Get(':id')
-  async getTaskById(
-    @Param('id') taskId: string,
-    @CurrentUser() user: User,
-  ) {
+  async getTaskById(@Param('id') taskId: string, @CurrentUser() user: User) {
     const task = await this.taskService.getTaskById(taskId, user.id);
     return { task };
   }
@@ -74,10 +57,7 @@ export class TaskController {
    * POST /api/task/perform
    */
   @Post('perform')
-  async performTask(
-    @CurrentUser() user: User,
-    @Body() performDto: PerformTaskRequestDto,
-  ) {
+  async performTask(@CurrentUser() user: User, @Body() performDto: PerformTaskRequestDto) {
     const task = await this.taskService.performTask(user.id, performDto);
     return { task };
   }
@@ -87,12 +67,8 @@ export class TaskController {
    * PUT /api/task/approve
    */
   @Put('approve')
-  async approveTask(
-    @CurrentUser() user: User,
-    @Body() approveDto: ApproveTaskRequestDto,
-  ) {
+  async approveTask(@CurrentUser() user: User, @Body() approveDto: ApproveTaskRequestDto) {
     const task = await this.taskService.approveTask(user.id, approveDto);
     return { task };
   }
 }
-
