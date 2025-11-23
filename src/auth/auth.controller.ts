@@ -2,7 +2,8 @@ import { Controller, Get, Post, Body, Headers, HttpCode, HttpStatus } from '@nes
 import { AuthService } from './auth.service';
 import type { RegisterDto } from './auth.service';
 import { IsString, IsEnum, IsNotEmpty } from 'class-validator';
-import { Sex } from '../entities/user.entity';
+import { Sex, UserDocument } from '../entities/user.entity';
+import { Types } from 'mongoose';
 
 class RegisterRequestDto implements RegisterDto {
   @IsString()
@@ -24,7 +25,26 @@ export class AuthController {
   @Get('me')
   async checkUser(@Headers('x-telegram-init-data') initData: string) {
     const user = await this.authService.checkUser(initData);
-    return { user };
+    
+    // Extract familyId from families array (since user can only have one family)
+    const families = user.families || [];
+    const familyId = families.length > 0 
+      ? (families[0] instanceof Types.ObjectId 
+          ? families[0].toString() 
+          : String(families[0]))
+      : null;
+    
+    // Create response object with familyId instead of families
+    // Use toJSON() to get plain object with virtual fields (like id)
+    const userDoc = user as UserDocument;
+    const userPlain = userDoc.toJSON ? userDoc.toJSON() : (user as any);
+    const { families: _, ...userWithoutFamilies } = userPlain;
+    const userResponse = {
+      ...userWithoutFamilies,
+      familyId,
+    };
+    
+    return { user: userResponse };
   }
 
   /**

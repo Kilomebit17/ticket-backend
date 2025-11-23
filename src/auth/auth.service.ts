@@ -40,9 +40,11 @@ export class AuthService {
     // Telegram ID
     const telegramId = String(tgId);
 
-    const user = await this.userModel.findOne({
-      telegramId,
-    }).exec();
+    const user = await this.userModel
+      .findOne({
+        telegramId,
+      })
+      .exec();
 
     if (!user) {
       throw new UnauthorizedException('User not found');
