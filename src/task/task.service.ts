@@ -146,13 +146,41 @@ export class TaskService {
       throw new ForbiddenException('You are not a member of this family');
     }
 
-    const tasks = await this.taskModel
-      .find({ familyId: new Types.ObjectId(familyId) })
-      .populate('creatorId')
-      .populate('solverId')
-      .populate('familyId')
-      .sort({ createdAt: -1 })
+    // Populate tasks from family's tasks array to ensure we get full task documents
+    const familyWithTasks = await this.familyModel
+      .findById(familyId)
+      .populate({
+        path: 'tasks',
+        populate: [
+          { path: 'creatorId', model: 'User' },
+          { path: 'solverId', model: 'User' },
+          { path: 'familyId', model: 'Family' },
+        ],
+      })
       .exec();
+
+    if (!familyWithTasks) {
+      throw new NotFoundException('Family not found');
+    }
+
+    // Convert to array and filter out null/undefined values
+    // After population, tasks should be TaskDocument instances
+    // Type guard to check if task is a populated document (has task properties)
+    const tasks = (familyWithTasks.tasks as unknown[])
+      .filter((task): task is TaskDocument => {
+        if (!task || typeof task !== 'object') {
+          return false;
+        }
+        // Check if it's a populated document by checking for task-specific properties
+        return 'name' in task && 'price' in task && 'status' in task;
+      });
+
+    // Sort by createdAt descending (most recent first)
+    tasks.sort((a, b) => {
+      const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+      const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+      return dateB.getTime() - dateA.getTime();
+    });
 
     return tasks;
   }
