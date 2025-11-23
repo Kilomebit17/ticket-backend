@@ -53,6 +53,48 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
+/**
+ * Helper function to normalize date fields from MongoDB Extended JSON format
+ * Handles both Date objects and Extended JSON format: { '$date': 'ISO_STRING' }
+ */
+function normalizeDate(value: any): Date | undefined {
+  if (!value) {
+    return undefined;
+  }
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return new Date(value);
+  }
+  if (value && typeof value === 'object' && '$date' in value) {
+    // MongoDB Extended JSON format
+    return new Date(value.$date);
+  }
+  return undefined;
+}
+
+// Pre-validate hook to normalize createdAt and updatedAt fields before validation
+UserSchema.pre('validate', function (next) {
+  // Normalize createdAt if it's in Extended JSON format
+  if (this.createdAt && typeof this.createdAt === 'object' && '$date' in this.createdAt) {
+    const normalized = normalizeDate(this.createdAt);
+    if (normalized) {
+      this.createdAt = normalized;
+    }
+  }
+  
+  // Normalize updatedAt if it's in Extended JSON format
+  if (this.updatedAt && typeof this.updatedAt === 'object' && '$date' in this.updatedAt) {
+    const normalized = normalizeDate(this.updatedAt);
+    if (normalized) {
+      this.updatedAt = normalized;
+    }
+  }
+  
+  next();
+});
+
 // Add virtual id field
 UserSchema.virtual('id').get(function () {
   return this._id.toHexString();
