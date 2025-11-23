@@ -227,7 +227,6 @@ export class FamilyService {
     const invite = await this.familyInviteModel
       .findById(respondDto.inviteId)
       .populate('fromUserId')
-      .populate('toUserId')
       .exec();
 
     if (!invite) {
@@ -235,7 +234,7 @@ export class FamilyService {
     }
 
     const userIdObj = new Types.ObjectId(userId);
-    const toUserIdObj = this.extractObjectId(invite.toUserId);
+    const toUserIdObj = new Types.ObjectId(invite.toUserId);
 
     if (!toUserIdObj.equals(userIdObj)) {
       throw new ForbiddenException('You are not authorized to respond to this invite');
