@@ -39,6 +39,17 @@ export class TaskService {
       throw new BadRequestException('Task price must be positive');
     }
 
+    // Check if user has sufficient balance
+    const user = await this.userModel.findById(userId).exec();
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.balance < createDto.price) {
+      throw new BadRequestException('Insufficient balance to create task');
+    }
+
     // Check if family exists and user is a member
     const family = await this.familyModel
       .findById(createDto.familyId)
