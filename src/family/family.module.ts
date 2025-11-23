@@ -6,6 +6,7 @@ import { Family, FamilySchema } from '../entities/family.entity';
 import { FamilyInvite, FamilyInviteSchema } from '../entities/family-invite.entity';
 import { User, UserSchema } from '../entities/user.entity';
 import { AuthModule } from '../auth/auth.module';
+import { TicketModule } from '../ticket/ticket.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: User.name, schema: UserSchema },
     ]),
     AuthModule,
+    TicketModule,
   ],
   controllers: [FamilyController],
   providers: [FamilyService],

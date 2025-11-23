@@ -13,6 +13,7 @@ import { Types } from 'mongoose';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { InviteToFamilyDto } from './dto/invite-to-family.dto';
 import { RespondToInviteDto } from './dto/respond-to-invite.dto';
+import { TicketService } from '../ticket/ticket.service';
 
 @Injectable()
 export class FamilyService {
@@ -23,6 +24,7 @@ export class FamilyService {
     private readonly familyInviteModel: Model<FamilyInviteDocument>,
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    private readonly ticketService: TicketService,
   ) {}
 
   /**
@@ -52,6 +54,9 @@ export class FamilyService {
     }
     user.families.push(savedFamily._id);
     await user.save();
+
+    // Award 1000 tickets to all family members
+    await this.awardTicketsToFamilyMembers(savedFamily.members);
 
     return savedFamily;
   }
@@ -208,6 +213,21 @@ export class FamilyService {
   }
 
   /**
+   * Award 1000 tickets to all family members when a family is created
+   */
+  private async awardTicketsToFamilyMembers(members: Types.ObjectId[]): Promise<void> {
+    const TICKET_REWARD = 1000;
+    const memberPromises = members.map((memberId) => {
+      const memberIdString = memberId instanceof Types.ObjectId 
+        ? memberId.toString() 
+        : memberId;
+      return this.ticketService.addTickets(memberIdString, TICKET_REWARD);
+    });
+    
+    await Promise.all(memberPromises);
+  }
+
+  /**
    * Respond to invite (accept or reject)
    */
   async respondToInvite(
@@ -301,6 +321,9 @@ export class FamilyService {
 
         // Update invite with created family ID
         invite.familyId = familyIdObj;
+
+        // Award 1000 tickets to all family members
+        await this.awardTicketsToFamilyMembers(savedFamily.members);
       } else {
         // Add user to existing family
         const familyIdObj = this.extractObjectId(invite.familyId);

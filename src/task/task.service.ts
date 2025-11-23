@@ -6,8 +6,6 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { InjectConnection } from '@nestjs/mongoose';
-import { Connection } from 'mongoose';
 import { Task, TaskStatus, TaskDocument } from '../entities/task.entity';
 import { User, UserDocument } from '../entities/user.entity';
 import { Family, FamilyDocument } from '../entities/family.entity';
@@ -27,8 +25,6 @@ export class TaskService {
     @InjectModel(Family.name)
     private readonly familyModel: Model<FamilyDocument>,
     private readonly ticketService: TicketService,
-    @InjectConnection()
-    private readonly connection: Connection,
   ) {}
 
   /**
@@ -70,49 +66,60 @@ export class TaskService {
       throw new ForbiddenException('You are not a member of this family');
     }
 
-    // Use MongoDB session for transaction
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    // Use atomic operations instead of transactions (works on standalone MongoDB)
+    // Step 1: Atomically deduct balance (only if sufficient)
+    const updatedUser = await this.userModel
+      .findOneAndUpdate(
+        {
+          _id: userId,
+          balance: { $gte: createDto.price }, // Only update if balance is sufficient
+        },
+        { $inc: { balance: -createDto.price } },
+        { new: true, runValidators: true }
+      )
+      .exec();
 
-    try {
-      // Lock user row (MongoDB doesn't have pessimistic locks, but we can use findOneAndUpdate with atomic operations)
-      const lockedUser = await this.userModel
-        .findById(userId)
-        .session(session)
-        .exec();
-
-      if (!lockedUser || lockedUser.balance < createDto.price) {
-        throw new BadRequestException('Insufficient balance');
+    if (!updatedUser) {
+      // Check if user exists to provide better error message
+      const userCheck = await this.userModel.findById(userId).exec();
+      if (!userCheck) {
+        throw new NotFoundException('User not found');
       }
-
-      // Deduct tickets atomically
-      lockedUser.balance -= createDto.price;
-      await lockedUser.save({ session });
-
-      // Create task
-      const task = new this.taskModel({
-        name: createDto.name,
-        description: createDto.description ?? null,
-        price: createDto.price,
-        familyId: new Types.ObjectId(createDto.familyId),
-        creatorId: new Types.ObjectId(userId),
-        status: TaskStatus.CREATED,
-      });
-
-      const savedTask = await task.save({ session });
-
-      // Add task to family's tasks array
-      family.tasks.push(savedTask._id);
-      await family.save({ session });
-
-      await session.commitTransaction();
-      return savedTask;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
+      throw new BadRequestException('Insufficient balance to create task');
     }
+
+    // Step 2: Create task
+    const task = new this.taskModel({
+      name: createDto.name,
+      description: createDto.description ?? null,
+      price: createDto.price,
+      familyId: new Types.ObjectId(createDto.familyId),
+      creatorId: new Types.ObjectId(userId),
+      status: TaskStatus.CREATED,
+    });
+
+    const savedTask = await task.save();
+
+    // Step 3: Atomically add task to family's tasks array
+    const updatedFamily = await this.familyModel
+      .findByIdAndUpdate(
+        createDto.familyId,
+        { $push: { tasks: savedTask._id } },
+        { new: true, runValidators: true }
+      )
+      .exec();
+
+    if (!updatedFamily) {
+      // Rollback: refund the balance and delete the task
+      await this.userModel.findByIdAndUpdate(
+        userId,
+        { $inc: { balance: createDto.price } }
+      ).exec();
+      await this.taskModel.findByIdAndDelete(savedTask._id).exec();
+      throw new NotFoundException('Family not found after task creation');
+    }
+
+    return savedTask;
   }
 
   /**
