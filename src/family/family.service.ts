@@ -218,24 +218,6 @@ export class FamilyService {
   }
 
   /**
-   * Helper to normalize date fields from MongoDB Extended JSON format
-   * Ensures dates are Date objects before saving
-   */
-  private normalizeUserDates(user: UserDocument): void {
-    if (user.createdAt && typeof user.createdAt === 'object' && '$date' in user.createdAt) {
-      user.createdAt = new Date((user.createdAt as any).$date);
-    } else if (user.createdAt && typeof user.createdAt === 'string') {
-      user.createdAt = new Date(user.createdAt);
-    }
-
-    if (user.updatedAt && typeof user.updatedAt === 'object' && '$date' in user.updatedAt) {
-      user.updatedAt = new Date((user.updatedAt as any).$date);
-    } else if (user.updatedAt && typeof user.updatedAt === 'string') {
-      user.updatedAt = new Date(user.updatedAt);
-    }
-  }
-
-  /**
    * Respond to invite (accept or reject)
    */
   async respondToInvite(
@@ -312,15 +294,19 @@ export class FamilyService {
         });
 
         if (!fromUserFamilyExists) {
-          fromUser.families.push(familyIdObj);
-          this.normalizeUserDates(fromUser);
-          await fromUser.save();
+          await this.userModel.findByIdAndUpdate(
+            fromUserIdObj,
+            { $addToSet: { families: familyIdObj } },
+            { new: true },
+          ).exec();
         }
 
         if (!toUserFamilyExists) {
-          toUser.families.push(familyIdObj);
-          this.normalizeUserDates(toUser);
-          await toUser.save();
+          await this.userModel.findByIdAndUpdate(
+            userId,
+            { $addToSet: { families: familyIdObj } },
+            { new: true },
+          ).exec();
         }
 
         // Update invite with created family ID
@@ -359,9 +345,11 @@ export class FamilyService {
           });
 
           if (!familyExists) {
-            toUser.families.push(familyIdObj);
-            this.normalizeUserDates(toUser);
-            await toUser.save();
+            await this.userModel.findByIdAndUpdate(
+              userId,
+              { $addToSet: { families: familyIdObj } },
+              { new: true },
+            ).exec();
           }
         }
       }
