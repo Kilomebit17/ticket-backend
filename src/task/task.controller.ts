@@ -39,7 +39,6 @@ export class TaskController {
   @Get('family/:familyId')
   async getFamilyTasks(@Param('familyId') familyId: string, @CurrentUser() user: User) {
     const tasks = await this.taskService.getFamilyTasks(familyId, user.id);
-    console.log('tasks', tasks);
     return { tasks };
   }
 
