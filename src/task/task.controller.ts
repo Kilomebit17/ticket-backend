@@ -6,6 +6,7 @@ import { User } from '../entities/user.entity';
 import { CreateTaskRequestDto } from './dto/create-task.dto';
 import { PerformTaskRequestDto } from './dto/perform-task.dto';
 import { ApproveTaskRequestDto } from './dto/approve-task.dto';
+import { SolveTaskRequestDto } from './dto/solve-task.dto';
 
 @Controller('task')
 @UseGuards(TelegramAuthGuard)
@@ -59,6 +60,16 @@ export class TaskController {
   @Post('perform')
   async performTask(@CurrentUser() user: User, @Body() performDto: PerformTaskRequestDto) {
     const task = await this.taskService.performTask(user.id, performDto);
+    return { task };
+  }
+
+  /**
+   * Solve a task (transform to pending status)
+   * POST /api/task/solve
+   */
+  @Post('solve')
+  async solveTask(@CurrentUser() user: User, @Body() solveDto: SolveTaskRequestDto) {
+    const task = await this.taskService.solveTask(user.id, solveDto);
     return { task };
   }
 

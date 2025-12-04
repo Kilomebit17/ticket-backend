@@ -14,6 +14,7 @@ import { Types } from 'mongoose';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { PerformTaskDto } from './dto/perform-task.dto';
 import { ApproveTaskDto } from './dto/approve-task.dto';
+import { SolveTaskDto } from './dto/solve-task.dto';
 
 @Injectable()
 export class TaskService {
@@ -253,6 +254,16 @@ export class TaskService {
     task.solvedAt = new Date();
 
     return await task.save();
+  }
+
+  /**
+   * Solve a task (mark as pending for approval)
+   * This is an alias for performTask with clearer semantic naming
+   */
+  async solveTask(userId: string, solveDto: SolveTaskDto): Promise<Task> {
+    // Reuse performTask logic since it does exactly what we need
+    const performDto: PerformTaskDto = { taskId: solveDto.taskId };
+    return this.performTask(userId, performDto);
   }
 
   /**
