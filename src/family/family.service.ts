@@ -91,7 +91,10 @@ export class FamilyService {
   async getFamilyById(familyId: string, userId: string): Promise<Family> {
     const family = await this.familyModel
       .findById(familyId)
-      .populate('members')
+      .populate({
+        path: 'members',
+        model: 'User',
+      })
       .populate({
         path: 'tasks',
         populate: [
